@@ -34,467 +34,482 @@ using Relation = Android.Provider.ContactsContract.CommonDataKinds.Relation;
 
 namespace Xamarin.Contacts
 {
-	internal static class ContactHelper
-	{
-		internal static IEnumerable<Contact> GetContacts (bool rawContacts, ContentResolver content, Resources resources)
-		{
-			Uri curi = (rawContacts)
+    internal static class ContactHelper
+    {
+        internal static IEnumerable<Contact> GetContacts(bool rawContacts, ContentResolver content, Resources resources)
+        {
+            Uri curi = (rawContacts)
 						? ContactsContract.RawContacts.ContentUri
 						: ContactsContract.Contacts.ContentUri;
 
-			ICursor cursor = null;
-			try
-			{
-				cursor = content.Query (curi, null, null, null, null);
-				if (cursor == null)
-					yield break;
+            ICursor cursor = null;
+            try
+            {
+                cursor = content.Query(curi, null, null, null, null);
+
+                if (cursor == null)
+                    yield break;
 				
-				foreach (Contact contact in GetContacts (cursor, rawContacts, content, resources, 20))
-				    yield return contact;
-			}
-			finally
-			{
-				if (cursor != null)
-					cursor.Close();
-			}
-		}
+                foreach (Contact contact in GetContacts (cursor, rawContacts, content, resources, 20))
+                    yield return contact;
+            }
+            finally
+            {
+                if (cursor != null)
+                    cursor.Close();
+            }
+        }
 
-		internal static IEnumerable<Contact> GetContacts (ICursor cursor, bool rawContacts, ContentResolver content, Resources resources, int batchSize)
-		{
-			if (cursor == null)
-				yield break;
+        internal static IEnumerable<Contact> GetContacts(ICursor cursor, bool rawContacts, ContentResolver content, Resources resources, int batchSize)
+        {
+            if (cursor == null)
+                yield break;
 
-			string column = (rawContacts)
+            string column = (rawContacts)
 								? ContactsContract.RawContactsColumns.ContactId
 								: ContactsContract.ContactsColumns.LookupKey;
 
-			string[] ids = new string[batchSize];
-			int columnIndex = cursor.GetColumnIndex (column);
+            string[] ids = new string[batchSize];
+            int columnIndex = cursor.GetColumnIndex(column);
 
-			HashSet<string> uniques = new HashSet<string>();
+            HashSet<string> uniques = new HashSet<string>();
 
-			int i = 0;
-			while (cursor.MoveToNext())
-			{
-				if (i == batchSize)
-				{
-					i = 0;
-					foreach (Contact c in GetContacts (rawContacts, content, resources, ids))
-						yield return c;
-				}
+            int i = 0;
+            while (cursor.MoveToNext())
+            {
+                if (i == batchSize)
+                {
+                    i = 0;
+                    foreach (Contact c in GetContacts (rawContacts, content, resources, ids))
+                        yield return c;
+                }
 
-				string id = cursor.GetString (columnIndex);
-				if (uniques.Contains (id))
-					continue;
+                string id = cursor.GetString(columnIndex);
+                if (uniques.Contains(id))
+                    continue;
 
-				uniques.Add (id);
-				ids[i++] = id;
-			}
+                uniques.Add(id);
+                ids[i++] = id;
+            }
 
-			if (i > 0)
-			{
-				foreach (Contact c in GetContacts (rawContacts, content, resources, ids.Take(i).ToArray()))
-					yield return c;
-			}
-		}
+            if (i > 0)
+            {
+                foreach (Contact c in GetContacts (rawContacts, content, resources, ids.Take(i).ToArray()))
+                    yield return c;
+            }
+        }
 
-		internal static IEnumerable<Contact> GetContacts (bool rawContacts, ContentResolver content, Resources resources, string[] ids)
-		{
-			ICursor c = null;
+        internal static IEnumerable<Contact> GetContacts(bool rawContacts, ContentResolver content, Resources resources, string[] ids)
+        {
+            ICursor c = null;
 
-			string column = (rawContacts)
+            string column = (rawContacts)
 								? ContactsContract.RawContactsColumns.ContactId
 								: ContactsContract.ContactsColumns.LookupKey;
 
-			StringBuilder whereb = new StringBuilder();
-			for (int i = 0; i < ids.Length; i++)
-			{
-				if (i > 0)
-					whereb.Append (" OR ");
+            StringBuilder whereb = new StringBuilder();
+            for (int i = 0; i < ids.Length; i++)
+            {
+                if (i > 0)
+                    whereb.Append(" OR ");
 
-				whereb.Append (column);
-				whereb.Append ("=?");
-			}
+                whereb.Append(column);
+                whereb.Append("=?");
+            }
 
-			int x = 0;
-			var map = new Dictionary<string, Contact> (ids.Length);
+            int x = 0;
+            var map = new Dictionary<string, Contact>(ids.Length);
 
-			try
-			{
-				Contact currentContact = null;
+            try
+            {
+                Contact currentContact = null;
 
-				c = content.Query (ContactsContract.Data.ContentUri, null, whereb.ToString(), ids, ContactsContract.ContactsColumns.LookupKey);
-				if (c == null)
-					yield break;
+                c = content.Query(ContactsContract.Data.ContentUri, null, whereb.ToString(), ids, ContactsContract.ContactsColumns.LookupKey);
+                if (c == null)
+                    yield break;
 
-				int idIndex = c.GetColumnIndex (column);
-				int dnIndex = c.GetColumnIndex (ContactsContract.ContactsColumns.DisplayName);
-				while (c.MoveToNext())
-				{
-					string id = c.GetString (idIndex);
-					if (currentContact == null || currentContact.Id != id)
-					{
-						// We need to yield these in the original ID order
-						if (currentContact != null) {
-							if (currentContact.Id == ids[x]) {
-								yield return currentContact;
-								x++;
-							}
-							else
-								map.Add (currentContact.Id, currentContact);
-						}
+                int idIndex = c.GetColumnIndex(column);
+                int dnIndex = c.GetColumnIndex(ContactsContract.ContactsColumns.DisplayName);
+                while (c.MoveToNext())
+                {
+                    string id = c.GetString(idIndex);
+                    if (currentContact == null || currentContact.Id != id)
+                    {
+                        // We need to yield these in the original ID order
+                        if (currentContact != null)
+                        {
+                            if (currentContact.Id == ids[x])
+                            {
+                                yield return currentContact;
+                                x++;
+                            }
+                            else
+                                map.Add(currentContact.Id, currentContact);
+                        }
 
-						currentContact = new Contact (id, !rawContacts, content);
-						currentContact.DisplayName = c.GetString (dnIndex);
-					}
+                        currentContact = new Contact(id, !rawContacts, content);
+                        currentContact.DisplayName = c.GetString(dnIndex);
+                    }
 
-					FillContactWithRow (resources, currentContact, c);
-				}
+                    FillContactWithRow(resources, currentContact, c);
+                }
 
-				if (currentContact != null)
-					map.Add (currentContact.Id, currentContact);
+                if (currentContact != null)
+                    map.Add(currentContact.Id, currentContact);
 
-				for (; x < ids.Length; x++)
-					yield return map[ids[x]];
-			}
-			finally
-			{
-				if (c != null)
-					c.Close();
-			}
-		}
+                for (; x < ids.Length; x++)
+                    yield return map[ids[x]];
+            }
+            finally
+            {
+                if (c != null)
+                    c.Close();
+            }
+        }
 
-		internal static Contact GetContact (bool rawContact, ContentResolver content, Resources resources, ICursor cursor)
-		{
-			string id = (rawContact)
-							? cursor.GetString (cursor.GetColumnIndex (ContactsContract.RawContactsColumns.ContactId))
-							: cursor.GetString (cursor.GetColumnIndex (ContactsContract.ContactsColumns.LookupKey));
+        internal static Contact GetContact(bool rawContact, ContentResolver content, Resources resources, ICursor cursor)
+        {
+            string id = (rawContact)
+							? cursor.GetString(cursor.GetColumnIndex(ContactsContract.RawContactsColumns.ContactId))
+							: cursor.GetString(cursor.GetColumnIndex(ContactsContract.ContactsColumns.LookupKey));
 
-			Contact contact = new Contact (id, !rawContact, content);
-			contact.DisplayName = GetString (cursor, ContactsContract.ContactsColumns.DisplayName);
+            Contact contact = new Contact(id, !rawContact, content);
+            contact.DisplayName = GetString(cursor, ContactsContract.ContactsColumns.DisplayName);
 
-			FillContactExtras (rawContact, content, resources, id, contact);
+            FillContactExtras(rawContact, content, resources, id, contact);
 
-			return contact;
-		}
+            return contact;
+        }
 
-		internal static void FillContactExtras (bool rawContact, ContentResolver content, Resources resources, string recordId, Contact contact)
-		{
-			ICursor c = null;
+        internal static void FillContactExtras(bool rawContact, ContentResolver content, Resources resources, string recordId, Contact contact)
+        {
+            ICursor c = null;
 
-			string column = (rawContact)
+            string column = (rawContact)
 								? ContactsContract.RawContactsColumns.ContactId
 								: ContactsContract.ContactsColumns.LookupKey;
 
-			try
-			{
-				c = content.Query (ContactsContract.Data.ContentUri, null, column + " = ?", new[] { recordId }, null);
-				if (c == null)
-					return;
+            try
+            {
+                c = content.Query(ContactsContract.Data.ContentUri, null, column + " = ?", new[] { recordId }, null);
+                if (c == null)
+                    return;
 
-				while (c.MoveToNext())
-					FillContactWithRow (resources, contact, c);
-			}
-			finally
-			{
-				if (c != null)
-					c.Close();
-			}
-		}
+                while (c.MoveToNext())
+                    FillContactWithRow(resources, contact, c);
+            }
+            finally
+            {
+                if (c != null)
+                    c.Close();
+            }
+        }
 
-		private static void FillContactWithRow (Resources resources, Contact contact, ICursor c)
-		{
-			string dataType = c.GetString (c.GetColumnIndex (ContactsContract.DataColumns.Mimetype));
-			switch (dataType)
-			{
-				case ContactsContract.CommonDataKinds.Nickname.ContentItemType:
-					contact.Nickname = c.GetString (c.GetColumnIndex (ContactsContract.CommonDataKinds.Nickname.Name));
-					break;
+        private static void FillContactWithRow(Resources resources, Contact contact, ICursor c)
+        {
+            string dataType = c.GetString(c.GetColumnIndex(ContactsContract.DataColumns.Mimetype));
+            switch (dataType)
+            {
+                case ContactsContract.CommonDataKinds.Nickname.ContentItemType:
+                    contact.Nickname = c.GetString(c.GetColumnIndex(ContactsContract.CommonDataKinds.Nickname.Name));
+                    break;
 
-				case StructuredName.ContentItemType:
-					contact.Prefix = c.GetString (StructuredName.Prefix);
-					contact.FirstName = c.GetString (StructuredName.GivenName);
-					contact.MiddleName = c.GetString (StructuredName.MiddleName);
-					contact.LastName = c.GetString (StructuredName.FamilyName);
-					contact.Suffix = c.GetString (StructuredName.Suffix);
-					break;
+                case StructuredName.ContentItemType:
+                    contact.Prefix = c.GetString(StructuredName.Prefix);
+                    contact.FirstName = c.GetString(StructuredName.GivenName);
+                    contact.MiddleName = c.GetString(StructuredName.MiddleName);
+                    contact.LastName = c.GetString(StructuredName.FamilyName);
+                    contact.Suffix = c.GetString(StructuredName.Suffix);
+                    break;
 
-				case ContactsContract.CommonDataKinds.Phone.ContentItemType:
-					contact.phones.Add (GetPhone (c, resources));
-					break;
+                case ContactsContract.CommonDataKinds.GroupMembership.ContentItemType:
+                    contact.groupMemberships.Add(GetContactGroupMembership(c, resources));
+                    break;
 
-				case ContactsContract.CommonDataKinds.Email.ContentItemType:
-					contact.emails.Add (GetEmail (c, resources));
-					break;
+                case ContactsContract.CommonDataKinds.Phone.ContentItemType:
+                    contact.phones.Add(GetPhone(c, resources));
+                    break;
 
-				case ContactsContract.CommonDataKinds.Note.ContentItemType:
-					contact.notes.Add (GetNote (c, resources));
-					break;
+                case ContactsContract.CommonDataKinds.Email.ContentItemType:
+                    contact.emails.Add(GetEmail(c, resources));
+                    break;
 
-				case ContactsContract.CommonDataKinds.Organization.ContentItemType:
-					contact.organizations.Add (GetOrganization (c, resources));
-					break;
+                case ContactsContract.CommonDataKinds.Note.ContentItemType:
+                    contact.notes.Add(GetNote(c, resources));
+                    break;
 
-				case StructuredPostal.ContentItemType:
-					contact.addresses.Add (GetAddress (c, resources));
-					break;
+                case ContactsContract.CommonDataKinds.Organization.ContentItemType:
+                    contact.organizations.Add(GetOrganization(c, resources));
+                    break;
 
-				case InstantMessaging.ContentItemType:
-					contact.instantMessagingAccounts.Add (GetImAccount (c, resources));
-					break;
+                case StructuredPostal.ContentItemType:
+                    contact.addresses.Add(GetAddress(c, resources));
+                    break;
 
-				case WebsiteData.ContentItemType:
-					contact.websites.Add (GetWebsite (c, resources));
-					break;
+                case InstantMessaging.ContentItemType:
+                    contact.instantMessagingAccounts.Add(GetImAccount(c, resources));
+                    break;
 
-				case Relation.ContentItemType:
-					contact.relationships.Add (GetRelationship (c, resources));
-					break;
-			}
-		}
+                case WebsiteData.ContentItemType:
+                    contact.websites.Add(GetWebsite(c, resources));
+                    break;
 
-		internal  static Note GetNote (ICursor c, Resources resources)
-		{
-			return new Note { Contents = GetString (c, ContactsContract.DataColumns.Data1) };
-		}
+                case Relation.ContentItemType:
+                    contact.relationships.Add(GetRelationship(c, resources));
+                    break;
+            }
+        }
 
-		internal static Relationship GetRelationship (ICursor c, Resources resources)
-		{
-			Relationship r = new Relationship { Name = c.GetString (Relation.Name) };
+        internal  static Note GetNote(ICursor c, Resources resources)
+        {
+            return new Note { Contents = GetString(c, ContactsContract.DataColumns.Data1) };
+        }
 
-			RelationDataKind rtype = (RelationDataKind)c.GetInt (c.GetColumnIndex (CommonColumns.Type));
-			switch (rtype)
-			{
-				case RelationDataKind.DomesticPartner:
-				case RelationDataKind.Spouse:
-				case RelationDataKind.Friend:
-					r.Type = RelationshipType.SignificantOther;
-					break;
+        internal static Relationship GetRelationship(ICursor c, Resources resources)
+        {
+            Relationship r = new Relationship { Name = c.GetString(Relation.Name) };
 
-				case RelationDataKind.Child:
-					r.Type = RelationshipType.Child;
-					break;
+            RelationDataKind rtype = (RelationDataKind)c.GetInt(c.GetColumnIndex(CommonColumns.Type));
+            switch (rtype)
+            {
+                case RelationDataKind.DomesticPartner:
+                case RelationDataKind.Spouse:
+                case RelationDataKind.Friend:
+                    r.Type = RelationshipType.SignificantOther;
+                    break;
 
-				default:
-					r.Type = RelationshipType.Other;
-					break;
-			}
+                case RelationDataKind.Child:
+                    r.Type = RelationshipType.Child;
+                    break;
 
-			return r;
-		}
+                default:
+                    r.Type = RelationshipType.Other;
+                    break;
+            }
 
-		internal static InstantMessagingAccount GetImAccount (ICursor c, Resources resources)
-		{
-			InstantMessagingAccount ima = new InstantMessagingAccount();
-			ima.Account = c.GetString (CommonColumns.Data);
+            return r;
+        }
 
-			//IMTypeDataKind imKind = (IMTypeDataKind) c.GetInt (c.GetColumnIndex (CommonColumns.Type));
-			//ima.Type = imKind.ToInstantMessagingType();
-			//ima.Label = InstantMessaging.GetTypeLabel (resources, imKind, c.GetString (CommonColumns.Label));
+        internal static InstantMessagingAccount GetImAccount(ICursor c, Resources resources)
+        {
+            InstantMessagingAccount ima = new InstantMessagingAccount();
+            ima.Account = c.GetString(CommonColumns.Data);
 
-			IMProtocolDataKind serviceKind = (IMProtocolDataKind) c.GetInt (c.GetColumnIndex (InstantMessaging.Protocol));
-			ima.Service = serviceKind.ToInstantMessagingService();
-			ima.ServiceLabel = (serviceKind != IMProtocolDataKind.Custom)
-								? InstantMessaging.GetProtocolLabel (resources, serviceKind, String.Empty)
-								: c.GetString (InstantMessaging.CustomProtocol);
+            //IMTypeDataKind imKind = (IMTypeDataKind) c.GetInt (c.GetColumnIndex (CommonColumns.Type));
+            //ima.Type = imKind.ToInstantMessagingType();
+            //ima.Label = InstantMessaging.GetTypeLabel (resources, imKind, c.GetString (CommonColumns.Label));
 
-			return ima;
-		}
+            IMProtocolDataKind serviceKind = (IMProtocolDataKind)c.GetInt(c.GetColumnIndex(InstantMessaging.Protocol));
+            ima.Service = serviceKind.ToInstantMessagingService();
+            ima.ServiceLabel = (serviceKind != IMProtocolDataKind.Custom)
+								? InstantMessaging.GetProtocolLabel(resources, serviceKind, String.Empty)
+								: c.GetString(InstantMessaging.CustomProtocol);
 
-		internal static Address GetAddress (ICursor c, Resources resources)
-		{
-			Address a = new Address();
-			a.Country = c.GetString (StructuredPostal.Country);
-			a.Region = c.GetString (StructuredPostal.Region);
-			a.City = c.GetString (StructuredPostal.City);
-			a.PostalCode = c.GetString (StructuredPostal.Postcode);
+            return ima;
+        }
 
-			AddressDataKind kind = (AddressDataKind) c.GetInt (c.GetColumnIndex (CommonColumns.Type));
-			a.Type = kind.ToAddressType();
-			a.Label = (kind != AddressDataKind.Custom)
-						? StructuredPostal.GetTypeLabel (resources, kind, String.Empty)
-						: c.GetString (CommonColumns.Label);
+        internal static Address GetAddress(ICursor c, Resources resources)
+        {
+            Address a = new Address();
+            a.Country = c.GetString(StructuredPostal.Country);
+            a.Region = c.GetString(StructuredPostal.Region);
+            a.City = c.GetString(StructuredPostal.City);
+            a.PostalCode = c.GetString(StructuredPostal.Postcode);
 
-			string street = c.GetString (StructuredPostal.Street);
-			string pobox = c.GetString (StructuredPostal.Pobox);
-			if (street != null)
-				a.StreetAddress = street;
-			if (pobox != null)
-			{
-				if (street != null)
-					a.StreetAddress += Environment.NewLine;
+            AddressDataKind kind = (AddressDataKind)c.GetInt(c.GetColumnIndex(CommonColumns.Type));
+            a.Type = kind.ToAddressType();
+            a.Label = (kind != AddressDataKind.Custom)
+						? StructuredPostal.GetTypeLabel(resources, kind, String.Empty)
+						: c.GetString(CommonColumns.Label);
 
-				a.StreetAddress += pobox;
-			}
-			return a;
-		}
+            string street = c.GetString(StructuredPostal.Street);
+            string pobox = c.GetString(StructuredPostal.Pobox);
+            if (street != null)
+                a.StreetAddress = street;
+            if (pobox != null)
+            {
+                if (street != null)
+                    a.StreetAddress += Environment.NewLine;
 
-		internal static Phone GetPhone (ICursor c, Resources resources)
-		{
-			Phone p = new Phone();
-			p.Number = GetString (c, ContactsContract.CommonDataKinds.Phone.Number);
+                a.StreetAddress += pobox;
+            }
+            return a;
+        }
 
-			PhoneDataKind pkind = (PhoneDataKind) c.GetInt (c.GetColumnIndex (CommonColumns.Type));
-			p.Type = pkind.ToPhoneType();
-			p.Label = (pkind != PhoneDataKind.Custom)
-						? ContactsContract.CommonDataKinds.Phone.GetTypeLabel (resources, pkind, String.Empty)
-						: c.GetString (CommonColumns.Label);
+        internal static Phone GetPhone(ICursor c, Resources resources)
+        {
+            Phone p = new Phone();
+            p.Number = GetString(c, ContactsContract.CommonDataKinds.Phone.Number);
 
-			return p;
-		}
+            PhoneDataKind pkind = (PhoneDataKind)c.GetInt(c.GetColumnIndex(CommonColumns.Type));
+            p.Type = pkind.ToPhoneType();
+            p.Label = (pkind != PhoneDataKind.Custom)
+						? ContactsContract.CommonDataKinds.Phone.GetTypeLabel(resources, pkind, String.Empty)
+						: c.GetString(CommonColumns.Label);
 
-		internal static Email GetEmail (ICursor c, Resources resources)
-		{
-			Email e = new Email();
-			e.Address = c.GetString (ContactsContract.DataColumns.Data1);
+            return p;
+        }
 
-			EmailDataKind ekind = (EmailDataKind) c.GetInt (c.GetColumnIndex (CommonColumns.Type));
-			e.Type = ekind.ToEmailType();
-			e.Label = (ekind != EmailDataKind.Custom)
-						? ContactsContract.CommonDataKinds.Email.GetTypeLabel (resources, ekind, String.Empty)
-						: c.GetString (CommonColumns.Label);
+        internal static Email GetEmail(ICursor c, Resources resources)
+        {
+            Email e = new Email();
+            e.Address = c.GetString(ContactsContract.DataColumns.Data1);
 
-			return e;
-		}
+            EmailDataKind ekind = (EmailDataKind)c.GetInt(c.GetColumnIndex(CommonColumns.Type));
+            e.Type = ekind.ToEmailType();
+            e.Label = (ekind != EmailDataKind.Custom)
+						? ContactsContract.CommonDataKinds.Email.GetTypeLabel(resources, ekind, String.Empty)
+						: c.GetString(CommonColumns.Label);
 
-		internal static Organization GetOrganization (ICursor c, Resources resources)
-		{
-			Organization o = new Organization();
-			o.Name = c.GetString (OrganizationData.Company);
-			o.ContactTitle = c.GetString (OrganizationData.Title);
+            return e;
+        }
 
-			OrganizationDataKind d = (OrganizationDataKind) c.GetInt (c.GetColumnIndex (CommonColumns.Type));
-			o.Type = d.ToOrganizationType();
-			o.Label = (d != OrganizationDataKind.Custom)
-						? OrganizationData.GetTypeLabel (resources, d, String.Empty)
-						: c.GetString (CommonColumns.Label);
+        internal static GroupMembership GetContactGroupMembership(ICursor c, Resources resources)
+        {
+            GroupMembership g = new GroupMembership();
+            g.GroupRowId = c.GetInt(c.GetColumnIndex(ContactsContract.CommonDataKinds.GroupMembership.GroupRowId));
+            g.GroupSourceId = c.GetString(c.GetColumnIndex(ContactsContract.CommonDataKinds.GroupMembership.GroupSourceId));
+            return g;
+        }
 
-			return o;
-		}
+        internal static Organization GetOrganization(ICursor c, Resources resources)
+        {
+            Organization o = new Organization();
+            o.Name = c.GetString(OrganizationData.Company);
+            o.ContactTitle = c.GetString(OrganizationData.Title);
 
-		internal static Website GetWebsite (ICursor c, Resources resources)
-		{
-			Website w = new Website();
-			w.Address = c.GetString (WebsiteData.Url);
+            OrganizationDataKind d = (OrganizationDataKind)c.GetInt(c.GetColumnIndex(CommonColumns.Type));
+            o.Type = d.ToOrganizationType();
+            o.Label = (d != OrganizationDataKind.Custom)
+						? OrganizationData.GetTypeLabel(resources, d, String.Empty)
+						: c.GetString(CommonColumns.Label);
 
-			//WebsiteDataKind kind = (WebsiteDataKind)c.GetInt (c.GetColumnIndex (CommonColumns.Type));
-			//w.Type = kind.ToWebsiteType();
-			//w.Label = (kind != WebsiteDataKind.Custom)
-			//            ? resources.GetString ((int) kind)
-			//            : c.GetString (CommonColumns.Label);
+            return o;
+        }
 
-			return w;
-		}
+        internal static Website GetWebsite(ICursor c, Resources resources)
+        {
+            Website w = new Website();
+            w.Address = c.GetString(WebsiteData.Url);
 
-		//internal static WebsiteType ToWebsiteType (this WebsiteDataKind websiteKind)
-		//{
-		//    switch (websiteKind)
-		//    {
-		//        case WebsiteDataKind.Work:
-		//            return WebsiteType.Work;
-		//        case WebsiteDataKind.Home:
-		//            return WebsiteType.Home;
+            //WebsiteDataKind kind = (WebsiteDataKind)c.GetInt (c.GetColumnIndex (CommonColumns.Type));
+            //w.Type = kind.ToWebsiteType();
+            //w.Label = (kind != WebsiteDataKind.Custom)
+            //            ? resources.GetString ((int) kind)
+            //            : c.GetString (CommonColumns.Label);
 
-		//        default:
-		//            return WebsiteType.Other;
-		//    }
-		//}
+            return w;
+        }
 
-		internal static string GetString (this ICursor c, string colName)
-		{
-			return c.GetString (c.GetColumnIndex (colName));
-		}
+        //internal static WebsiteType ToWebsiteType (this WebsiteDataKind websiteKind)
+        //{
+        //    switch (websiteKind)
+        //    {
+        //        case WebsiteDataKind.Work:
+        //            return WebsiteType.Work;
+        //        case WebsiteDataKind.Home:
+        //            return WebsiteType.Home;
 
-		internal static AddressType ToAddressType (this AddressDataKind addressKind)
-		{
-			switch (addressKind)
-			{
-				case AddressDataKind.Home:
-					return AddressType.Home;
-				case AddressDataKind.Work:
-					return AddressType.Work;
-				default:
-					return AddressType.Other;
-			}
-		}
+        //        default:
+        //            return WebsiteType.Other;
+        //    }
+        //}
 
-		internal static EmailType ToEmailType (this EmailDataKind emailKind)
-		{
-			switch (emailKind)
-			{
-				case EmailDataKind.Home:
-					return EmailType.Home;
-				case EmailDataKind.Work:
-					return EmailType.Work;
-				default:
-					return EmailType.Other;
-			}
-		}
+        internal static string GetString(this ICursor c, string colName)
+        {
+            return c.GetString(c.GetColumnIndex(colName));
+        }
 
-		internal static PhoneType ToPhoneType (this PhoneDataKind phoneKind)
-		{
-			switch (phoneKind)
-			{
-				case PhoneDataKind.Home:
-					return PhoneType.Home;
-				case PhoneDataKind.Mobile:
-					return PhoneType.Mobile;
-				case PhoneDataKind.FaxHome:
-					return PhoneType.HomeFax;
-				case PhoneDataKind.Work:
-					return PhoneType.Work;
-				case PhoneDataKind.FaxWork:
-					return PhoneType.WorkFax;
-				case PhoneDataKind.Pager:
-				case PhoneDataKind.WorkPager:
-					return PhoneType.Pager;
-				default:
-					return PhoneType.Other;
-			}
-		}
+        internal static AddressType ToAddressType(this AddressDataKind addressKind)
+        {
+            switch (addressKind)
+            {
+                case AddressDataKind.Home:
+                    return AddressType.Home;
+                case AddressDataKind.Work:
+                    return AddressType.Work;
+                default:
+                    return AddressType.Other;
+            }
+        }
 
-		internal static OrganizationType ToOrganizationType (this OrganizationDataKind organizationKind)
-		{
-			switch (organizationKind)
-			{
-				case OrganizationDataKind.Work:
-					return OrganizationType.Work;
+        internal static EmailType ToEmailType(this EmailDataKind emailKind)
+        {
+            switch (emailKind)
+            {
+                case EmailDataKind.Home:
+                    return EmailType.Home;
+                case EmailDataKind.Work:
+                    return EmailType.Work;
+                default:
+                    return EmailType.Other;
+            }
+        }
 
-				default:
-					return OrganizationType.Other;
-			}
-		}
+        internal static PhoneType ToPhoneType(this PhoneDataKind phoneKind)
+        {
+            switch (phoneKind)
+            {
+                case PhoneDataKind.Home:
+                    return PhoneType.Home;
+                case PhoneDataKind.Mobile:
+                    return PhoneType.Mobile;
+                case PhoneDataKind.FaxHome:
+                    return PhoneType.HomeFax;
+                case PhoneDataKind.Work:
+                    return PhoneType.Work;
+                case PhoneDataKind.FaxWork:
+                    return PhoneType.WorkFax;
+                case PhoneDataKind.Pager:
+                case PhoneDataKind.WorkPager:
+                    return PhoneType.Pager;
+                default:
+                    return PhoneType.Other;
+            }
+        }
 
-		internal static InstantMessagingService ToInstantMessagingService (this IMProtocolDataKind protocolKind)
-		{
-			switch (protocolKind)
-			{
-				case IMProtocolDataKind.Aim:
-					return InstantMessagingService.Aim;
-				case IMProtocolDataKind.Msn:
-					return InstantMessagingService.Msn;
-				case IMProtocolDataKind.Yahoo:
-					return InstantMessagingService.Yahoo;
-				case IMProtocolDataKind.Jabber:
-					return InstantMessagingService.Jabber;
-				case IMProtocolDataKind.Icq:
-					return InstantMessagingService.Icq;
-				default:
-					return InstantMessagingService.Other;
-			}
-		}
+        internal static OrganizationType ToOrganizationType(this OrganizationDataKind organizationKind)
+        {
+            switch (organizationKind)
+            {
+                case OrganizationDataKind.Work:
+                    return OrganizationType.Work;
 
-		//internal static InstantMessagingType ToInstantMessagingType (this IMTypeDataKind imKind)
-		//{
-		//    switch (imKind)
-		//    {
-		//        case IMTypeDataKind.Home:
-		//            return InstantMessagingType.Home;
-		//        case IMTypeDataKind.Work:
-		//            return InstantMessagingType.Work;
-		//        default:
-		//            return InstantMessagingType.Other;
-		//    }
-		//}
-	}
+                default:
+                    return OrganizationType.Other;
+            }
+        }
+
+        internal static InstantMessagingService ToInstantMessagingService(this IMProtocolDataKind protocolKind)
+        {
+            switch (protocolKind)
+            {
+                case IMProtocolDataKind.Aim:
+                    return InstantMessagingService.Aim;
+                case IMProtocolDataKind.Msn:
+                    return InstantMessagingService.Msn;
+                case IMProtocolDataKind.Yahoo:
+                    return InstantMessagingService.Yahoo;
+                case IMProtocolDataKind.Jabber:
+                    return InstantMessagingService.Jabber;
+                case IMProtocolDataKind.Icq:
+                    return InstantMessagingService.Icq;
+                default:
+                    return InstantMessagingService.Other;
+            }
+        }
+
+        //internal static InstantMessagingType ToInstantMessagingType (this IMTypeDataKind imKind)
+        //{
+        //    switch (imKind)
+        //    {
+        //        case IMTypeDataKind.Home:
+        //            return InstantMessagingType.Home;
+        //        case IMTypeDataKind.Work:
+        //            return InstantMessagingType.Work;
+        //        default:
+        //            return InstantMessagingType.Other;
+        //    }
+        //}
+    }
 }
