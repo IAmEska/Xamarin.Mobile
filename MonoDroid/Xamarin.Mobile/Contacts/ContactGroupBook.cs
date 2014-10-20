@@ -78,14 +78,16 @@ namespace Xamarin.Contacts
             });
         }
 
-        public ContactGroupBook(Context context)
+        public ContactGroupBook(Context context, bool enableSummary = false)
         {
             if (context == null)
                 throw new ArgumentNullException("context");
 
+            EnableSummary = enableSummary;
             this.content = context.ContentResolver;
             this.resources = context.Resources;
             this.contactGroupProvider = new ContactGroupQueryProvider(EnableSummary, content, resources);
+
         }
 
         public bool EnableSummary{ get; set; }

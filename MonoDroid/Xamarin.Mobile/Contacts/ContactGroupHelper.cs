@@ -143,6 +143,9 @@ namespace Xamarin.Contacts
             group.Notes = cursor.GetString(ContactsContract.GroupsColumns.Notes);
             group.ShoudSync = cursor.GetInt(cursor.GetColumnIndex(ContactsContract.GroupsColumns.ShouldSync));
 
+            //FIXME data_set is not const value for ContactContract.GroupsColumns.DataSet
+            group.DataSet = cursor.GetString(cursor.GetColumnIndex("data_set"));
+
             int sumIndex = cursor.GetColumnIndex(ContactsContract.GroupsColumns.SummaryCount);
             if (sumIndex > -1)
                 group.SummaryCount = cursor.GetInt(sumIndex);

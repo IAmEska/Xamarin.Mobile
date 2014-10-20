@@ -25,6 +25,8 @@ namespace Xamarin.Contacts
         public int ShoudSync{ get; set; }
 
         public string SystemId{ get; set; }
+
+        public string DataSet{ get; set; }
     }
 }
 
